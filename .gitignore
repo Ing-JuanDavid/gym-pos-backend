@@ -1,0 +1,34 @@
+# Entorno virtual
+.venv/
+env/
+venv/
+
+# Archivos de dependencias generados
+uv.lock
+
+# Archivos de base de datos locales
+*.db
+*.sqlite3
+
+# Migraciones compiladas (solo si no quieres subirlas todas)
+alembic/__pycache__/
+
+# Archivos de caché de Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Archivos de logs
+*.log
+
+# Configuración de VSCode / IDE
+.vscode/
+.idea/
+
+# Archivos temporales del sistema
+.DS_Store
+Thumbs.db
+
+# Archivos de entorno (variables secretas)
+.env
+.env.*
