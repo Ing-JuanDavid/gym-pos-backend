@@ -9,5 +9,5 @@ class Customer(SQLModel, table=True):
     last_name: str = Field(max_length=50)
     phone: str = Field(max_length=15)
     email: str = Field(max_length=70, default='')
-    sex: str = Field(max_length=1)
+    sex: str = Field(max_length=1, default='N')
     birth: date | None = Field(default=None)
