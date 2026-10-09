@@ -11,3 +11,4 @@ class Customer(SQLModel, table=True):
     email: str = Field(max_length=70, default='')
     sex: str = Field(max_length=1, default='N')
     birth: date | None = Field(default=None)
+    is_active: bool = True

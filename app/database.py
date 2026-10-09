@@ -2,7 +2,7 @@
 from typing import Annotated
 from fastapi import Depends
 from sqlmodel import create_engine, SQLModel, Session
-from app.models.customers import *
+import app.models
 from app.config import settings
 
 
