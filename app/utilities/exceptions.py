@@ -13,3 +13,10 @@ def invalid(entity: str):
         status_code=status.HTTP_409_CONFLICT,
         detail=f"{entity} invalid"
     )
+
+
+def confict(msj: str):
+    return HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail=msj
+    )

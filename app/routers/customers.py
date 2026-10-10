@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Path
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.schemes.customer import CustomerPublic, CustomerCreate, CustomerUpdate
+from app.utilities.exceptions import not_found
 
 router = APIRouter(prefix="/customers", tags=["customer"])
 
@@ -8,6 +9,16 @@ router = APIRouter(prefix="/customers", tags=["customer"])
 @router.get("", response_model=list[CustomerPublic])
 async def read_all(service: CustomerServiceDep):
     return service.read_customers()
+
+
+@router.get("/{nuip}", response_model=CustomerPublic)
+async def get_customer(nuip: int, service: CustomerServiceDep):
+    db_customer = service.get_customer(nuip)
+
+    if not db_customer:
+        raise not_found("customer")
+
+    return db_customer
 
 
 @router.post("", response_model=CustomerPublic)

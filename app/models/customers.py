@@ -1,5 +1,7 @@
-from sqlmodel import SQLModel, Field, table
+from sqlmodel import SQLModel, Field, table, Relationship
 from datetime import date
+from app.models.membership import Membership
+from typing import Optional
 
 
 class Customer(SQLModel, table=True):
@@ -12,3 +14,6 @@ class Customer(SQLModel, table=True):
     sex: str = Field(max_length=1, default='N')
     birth: date | None = Field(default=None)
     is_active: bool = True
+
+    memberships: list["Membership"] = Relationship(
+        back_populates="customer")

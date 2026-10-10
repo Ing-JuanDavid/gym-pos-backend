@@ -1,6 +1,7 @@
 from app.database import Session, SessionDep
 from sqlmodel import select
 from app.models.customers import Customer
+from app.models.membership import Membership
 from app.utilities.exceptions import not_found, invalid
 from fastapi import Depends
 from typing import Annotated
@@ -12,13 +13,16 @@ class CustomerService:
     def __init__(self, session: Session):
         self.session = session
 
-    def find_customer(self, nuip: int) -> Customer | None:
+    def get_customer_id(self, customer_id: int) -> Customer | None:
+        return self.session.get(Customer, customer_id)
+
+    def get_customer(self, nuip: int) -> Customer | None:
         statement = select(Customer).where(Customer.nuip == nuip)
         return self.session.exec(statement).first()
 
     def create_customer(self, customer: CustomerCreate) -> CustomerPublic:
 
-        db_customer = self.find_customer(customer.nuip)
+        db_customer = self.get_customer(customer.nuip)
 
         if db_customer:
             raise invalid("customer")
@@ -59,6 +63,13 @@ class CustomerService:
 
         self.session.delete(db_customer)
         self.session.commit()
+
+    def get_active_membership(self, memberships: list[Membership]) -> Membership | None:
+        for m in memberships:
+            if m.status:
+                return m
+
+        return None
 
 
 def get_customer_Service(session: SessionDep) -> CustomerService:
