@@ -17,3 +17,7 @@ class Customer(SQLModel, table=True):
 
     memberships: list["Membership"] = Relationship(
         back_populates="customer")
+
+    attendances: list["Attendance"] = Relationship(
+        back_populates="customer"
+    )

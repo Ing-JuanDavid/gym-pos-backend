@@ -15,7 +15,7 @@ def invalid(entity: str):
     )
 
 
-def confict(msj: str):
+def conflict(msj: str):
     return HTTPException(
         status_code=status.HTTP_409_CONFLICT,
         detail=msj

@@ -4,7 +4,7 @@ from app.models.membership import Membership
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.services.plan import PlanService, PlanServiceDep
 from app.schemes.membership import MembershipCreate, MembershipUpdate, MembershipPublic
-from app.utilities.exceptions import not_found, invalid, confict
+from app.utilities.exceptions import not_found, invalid
 from typing import Annotated
 from fastapi import Depends
 from datetime import date

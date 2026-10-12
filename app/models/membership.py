@@ -12,3 +12,5 @@ class Membership(SQLModel, table=True):
     plan_id: int = Field(foreign_key="plan.plan_id")
 
     customer: Optional["Customer"] = Relationship(back_populates="memberships")
+
+    attendances: list["Attendance"] = Relationship(back_populates="membership")
