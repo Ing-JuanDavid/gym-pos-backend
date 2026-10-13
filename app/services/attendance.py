@@ -117,9 +117,3 @@ def get_attendance_service(session: SessionDep, customer_service: CustomerServic
 
 AttendanceServiceDep = Annotated[AttendanceService, Depends(
     get_attendance_service)]
-
-
-# al crear asistencia, verificar que el usuario no tenga una asistencia ese dia*
-# al egnerar una asistencia si es por membersia diaria, generar un movimiento de pago, si es por membreia borrar un dia
-#  al crera un anueva membresia generar el movimiento
-# busccar un mecanismo para

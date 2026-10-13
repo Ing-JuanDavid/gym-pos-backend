@@ -15,7 +15,8 @@ class Payment(SQLModel, table=True):
     customer_id: int = Field(foreign_key="customer.customer_id")
     amount: int
     payment_method: PaymentMethod
-    created_at: datetime = Field(default_factory=datetime.now)
+    created_at: datetime = Field(sa_column=Column(DateTime(timezone=False)),
+                                 default_factory=datetime.now)
 
     details: list["PaymentDetail"] = Relationship(back_populates="payment")
 
