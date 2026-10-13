@@ -1,6 +1,8 @@
 from fastapi import APIRouter, Depends, Query
 from app.services.attendance import AttendanceService, AttendanceServiceDep
+from app.services.customer import CustomerService, CustomerServiceDep
 from app.schemes.attendance import AttendanceCreate, AttendancePublic
+from app.utilities.exceptions import not_found
 
 router = APIRouter(prefix="/attendances", tags=["attendances"])
 
@@ -36,6 +38,16 @@ def get_attendance(
     return service.get_attendance(attendance_id)
 
 # READ (historial por cliente)
+
+
+@router.get("/current/customer/{customer_id}", response_model=AttendancePublic | None)
+async def get_current_attendance(customer_id: int, service: AttendanceServiceDep, customer_service: CustomerServiceDep):
+    db_customer = customer_service.get_customer_id(customer_id)
+
+    if not db_customer:
+        raise not_found("customer")
+
+    return service.get_current_attendance(db_customer)
 
 
 @router.get("/customer/{customer_id}", response_model=list[AttendancePublic])
