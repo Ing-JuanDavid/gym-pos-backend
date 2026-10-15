@@ -103,7 +103,7 @@ def get_payment_service(session: SessionDep) -> PaymentService:
 PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
 
 
-# pulir los dto de payment
+# pulir los dto de payment .
 # crear cash movement crud
 # cuando una memebrsia sea asignada, generar un payment y un moviiento de caja asociado
 # al egnerar una asistencia si es por membersia diaria, generar un movimiento de pago
