@@ -11,7 +11,7 @@ class ItemType(str, Enum):
 
 class PaymentCreate(BaseModel):
     payment_method: PaymentMethod
-    details: list[PaymentDetail]
+    amount: int = Field(gt=0)
 
 
 class PaymentDetail(BaseModel):
@@ -20,8 +20,8 @@ class PaymentDetail(BaseModel):
     quantity: int = Field(gt=0)
 
 
-# class PublicPayment(BaseModel):
-#     payment_id: int
-#     customer_id: int
-#     payment_method: PaymentMethod
-#     created_at: datetime
+class PaymentPublic(BaseModel):
+    payment_id: int
+    amount: int
+    payment_method: PaymentMethod
+    created_at: datetime

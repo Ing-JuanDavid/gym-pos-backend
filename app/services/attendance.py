@@ -21,35 +21,27 @@ class AttendanceService:
         self.membership_service = membership_service
 
     # CREATE (Check-in)
-    def check_in(self, data: AttendanceCreate, daily_membership: bool = False) -> AttendancePublic:
-        DAILY_MEMBERSHIP_ID = 1
+    def check_in(self, data: AttendanceCreate) -> AttendancePublic:
 
         #  check the customer and membership
-        db_customer = self.customer_service.get_customer_id(data.customer_id)
+        db_customer = self.customer_service.get_customer(data.nuip)
 
         if not db_customer:
             raise not_found("customer")
 
-        membership_id = None
+        active_membership = self.customer_service.get_active_membership(
+            db_customer.memberships)
 
-        if daily_membership:
-            membership_id = DAILY_MEMBERSHIP_ID
-        else:
-            active_membership = self.customer_service.get_active_membership(
-                db_customer.memberships)
-
-            if not active_membership:
-                raise conflict("no membership activated yet")
-
-            membership_id = active_membership.membership_id
+        if not active_membership:
+            raise conflict("no membership activated yet")
 
         # check current attendance
         if (self.get_current_attendance(db_customer)):
             raise conflict("user already attended")
 
         attendance = Attendance(
-            customer_id=data.customer_id,
-            membership_id=membership_id,
+            customer_id=db_customer.customer_id,
+            membership_id=active_membership.membership_id,
         )
         self.session.add(attendance)
         self.session.commit()

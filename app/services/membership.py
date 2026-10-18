@@ -4,10 +4,10 @@ from app.models.membership import Membership
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.services.plan import PlanService, PlanServiceDep
 from app.schemes.membership import MembershipCreate, MembershipUpdate, MembershipPublic
-from app.utilities.exceptions import not_found, invalid
+from app.utilities.exceptions import not_found, conflict
 from typing import Annotated
 from fastapi import Depends
-from datetime import date
+from datetime import date, timedelta
 
 
 class MembershipService:
@@ -20,8 +20,16 @@ class MembershipService:
     def create_membership(self, data: MembershipCreate) -> MembershipPublic:
 
         self.validate_data(data)
+
+        db_plan = self.plan_service.get_plan(data.plan_id)
+
+        if not db_plan:
+            raise not_found("plan")
+
         new_membership = Membership.model_validate(data)
         new_membership.start_date = date.today()
+        time_delta = timedelta(days=db_plan.duration)
+        new_membership.end_date = new_membership.start_date+time_delta
         # set ending date by calculing form duration
         self.session.add(new_membership)
         self.session.commit()
@@ -76,11 +84,8 @@ class MembershipService:
         if not db_customer:
             raise not_found("customer")
 
-        if not self.plan_service.get_plan(data.plan_id):
-            raise not_found("plan")
-
         if self.customer_service.get_active_membership(db_customer.memberships):
-            raise confict("user already has a membership")
+            raise conflict("user already has a membership")
 
 
 def get_membership_service(

@@ -14,7 +14,8 @@ class Attendance(SQLModel, table=True):
         sa_column=Column(DateTime(timezone=False)),
         default=None
     )
-    customer_id: int = Field(foreign_key="customer.customer_id")
+    customer_id: int = Field(
+        foreign_key="customer.customer_id", ondelete="CASCADE")
     membership_id: int = Field(foreign_key="membership.membership_id")
 
     customer: "Customer" = Relationship(

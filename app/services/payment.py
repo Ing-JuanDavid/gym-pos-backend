@@ -2,111 +2,94 @@ from app.database import Session, SessionDep
 from sqlmodel import select
 from fastapi import HTTPException, Depends
 from datetime import datetime
+from typing import Optional
 
-from app.models import Payment, PaymentDetail, Product
-from app.models import Plan
+from app.models import Payment
+from app.models.sale import Sale
 from app.models.customers import Customer
 from app.schemes.payment import PaymentCreate
 from app.utilities.exceptions import not_found, conflict
 from typing import Annotated
+from app.services.sale import SaleService, SaleServiceDep
+from app.models.sale import SaleStatus, SaleDetail
+from app.models.cash_movement import CashMovement, MovementType
+from app.models.payment import PaymentMethod
+from app.services.cash_movement import CashMovementService, CashMovementServiceDep
+from app.services.membership import MembershipService, MembershipServiceDep
+from app.schemes.membership import MembershipCreate
+from app.services.plan import PlanService, PlanServiceDep
+from app.models.plan import Plan
 
 
 class PaymentService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, sale_service: SaleService, cash_movement_service: CashMovementService, membership_service: MembershipService, plan_service: PlanService):
         self.session = session
+        self.sale_service = sale_service
+        self.cash_movement_service = cash_movement_service
+        self.membership_service = membership_service
+        self.plan_service = plan_service
 
-    def create_payment(self, customer_id: int, payment: PaymentCreate) -> Payment:
+    def create_payment(self, sale_id: int, payment: PaymentCreate) -> Payment:
+        try:
+            db_sale = self.sale_service.get_sale(sale_id)
 
-        db_customer = self.session.get(Customer, customer_id)
+            if db_sale.status == SaleStatus.PAGADA:
+                raise conflict("sale already paid")
 
-        if not db_customer:
-            raise not_found("customer")
+            pending_amount = self.sale_service.get_pending_amount(db_sale)
 
-        total_amount = 0
-        payment_details = []
+            if payment.amount > pending_amount:
+                raise conflict("invald amount")
 
-        for d in payment.details:
-            if d.item_type == "PRODUCTO":
-                product = self.session.get(Product, d.item_id)
-                if not product:
-                    raise not_found("product")
-                if product.stock < d.quantity:
-                    raise conflict("insufficient stock")
+            plan = self.get_plan_from_details(db_sale.details)
 
-                # usar precio real del producto
-                unit_price = product.price
-                total_amount += d.quantity * unit_price
-
-                # disminuir stock
-                product.stock -= d.quantity
-                self.session.add(product)
-
-            elif d.item_type == "PLAN":
-                # aquí deberías obtener la membresía desde la BD
-                # por ejemplo: membership = self.session.get(Membership, d["item_id"])
-                # unit_price = membership.plan.amount
-                # para simplificar, supongamos que membership tiene un campo "price"
-                plan = self.session.get(Plan, d.item_id)
-                if not plan:
-                    raise not_found("plan")
-
-                unit_price = plan.amount
-                total_amount += unit_price
-
-            else:
-                raise conflict("invalid type item")
-
-            payment_details.append(
-                PaymentDetail(
-                    item_type=d.item_type,
-                    item_id=d.item_id,
-                    quantity=d.quantity,
-                    unit_price=unit_price
-                )
+            # payment
+            db_payment = Payment(
+                amount=payment.amount,
+                payment_method=payment.payment_method,
+                sale_id=sale_id
             )
 
-        # crear cabecera
-        payment = Payment(
-            customer_id=customer_id,
-            amount=total_amount,
-            payment_method=payment.payment_method,
-        )
-        self.session.add(payment)
-        self.session.commit()
-        self.session.refresh(payment)
+            db_sale.payments.append(db_payment)
+            pending_amount -= payment.amount
+            db_sale.status = SaleStatus.PAGADA if pending_amount == 0 else SaleStatus.PARCIAL
 
-        # guardar detalles
-        for detail in payment_details:
-            detail.payment_id = payment.payment_id
-            self.session.add(detail)
+            if db_sale.status == SaleStatus.PAGADA and plan:
 
-        self.session.commit()
-        self.session.refresh(payment)
-        return payment
+                self.membership_service.create_membership(
+                    MembershipCreate(
+                        customer_id=db_sale.customer_id,
+                        plan_id=plan.plan_id,
+                    )
+                )
 
-    def get_payments_by_customer(self, customer_id: int) -> list[Payment]:
-        """Obtiene todos los pagos de un cliente."""
-        statement = select(Payment).where(Payment.customer_id == customer_id)
+            #  create a cash movmeent
+            self.cash_movement_service.create_movement(
+                db_payment.amount, db_payment.payment_method, MovementType.ENTRADA)
+
+            self.session.commit()
+            self.session.refresh(db_payment)
+
+        except Exception as e:
+            self.session.rollback()
+            raise e
+        return db_payment
+
+    def get_payments_by_sale(self, sale_id: int) -> list[Payment]:
+        """Obtiene todos los pagos de una venta."""
+        statement = select(Payment).where(Payment.sale_id == sale_id)
         return self.session.exec(statement).all()
 
-    def get_payment_details(self, payment_id: int) -> list[PaymentDetail]:
-        """Obtiene el detalle de un pago específico."""
-        statement = select(PaymentDetail).where(
-            PaymentDetail.payment_id == payment_id)
-        return self.session.exec(statement).all()
+    def get_plan_from_details(self, details: list[SaleDetail]) -> Optional[Plan]:
+        for d in details:
+            if d.item_type == "PLAN":
+                return self.plan_service.get_plan(d.item_id)
+
+        return None
 
 
-def get_payment_service(session: SessionDep) -> PaymentService:
-    return PaymentService(session)
+def get_payment_service(session: SessionDep, sale_service: SaleServiceDep, cash_movement_service: CashMovementServiceDep, membership_service: MembershipServiceDep, plan_service: PlanServiceDep) -> PaymentService:
+    return PaymentService(session, sale_service, cash_movement_service, membership_service, plan_service)
 
 
 PaymentServiceDep = Annotated[PaymentService, Depends(get_payment_service)]
-
-
-# pulir los dto de payment .
-# crear cash movement crud
-# cuando una memebrsia sea asignada, generar un payment y un moviiento de caja asociado
-# al egnerar una asistencia si es por membersia diaria, generar un movimiento de pago
-# busccar un mecanismo para
-# crear fingerprit
-# proteger endpoinds

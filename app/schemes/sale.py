@@ -2,6 +2,7 @@ from pydantic import BaseModel, Field
 from enum import Enum
 from app.models.payment import PaymentMethod
 from datetime import datetime
+from app.models.sale import SaleStatus, SaleDetail
 
 
 class ItemType(str, Enum):
@@ -10,8 +11,18 @@ class ItemType(str, Enum):
 
 
 class SaleCreate(BaseModel):
-    customer_id: int
+    nuip: int
     details: list[PaymentDetail]
+
+
+class SaleResume(BaseModel):
+    sale_id: int
+    nuip: int
+    total: int
+    created_at: datetime
+    status: SaleStatus
+    pending_amout: int
+    details: list[SaleDetail]
 
 
 class PaymentDetail(BaseModel):

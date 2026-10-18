@@ -17,5 +17,5 @@ class Payment(SQLModel, table=True):
     created_at: datetime = Field(sa_column=Column(DateTime(timezone=False)),
                                  default_factory=datetime.now)
 
-    sale_id: int = Field(foreign_key="sale.sale_id")
+    sale_id: int = Field(foreign_key="sale.sale_id", ondelete="CASCADE")
     sale: "Sale" = Relationship(back_populates="payments")

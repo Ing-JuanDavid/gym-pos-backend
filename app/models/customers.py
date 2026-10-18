@@ -16,8 +16,8 @@ class Customer(SQLModel, table=True):
     is_active: bool = True
 
     memberships: list["Membership"] = Relationship(
-        back_populates="customer")
+        back_populates="customer", cascade_delete=True)
 
     attendances: list["Attendance"] = Relationship(
-        back_populates="customer"
+        back_populates="customer",  cascade_delete=True
     )

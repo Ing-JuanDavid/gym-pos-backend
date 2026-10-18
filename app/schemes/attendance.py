@@ -3,7 +3,7 @@ from datetime import datetime
 
 
 class AttendanceCreate(BaseModel):
-    customer_id: int
+    nuip: int
 
 
 class AttendanceUpdate(BaseModel):

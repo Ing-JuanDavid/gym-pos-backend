@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.database import create_db_and_tables, boostrapt_db
-from app.routers import customers, plan, membership, attendance, sale
+from app.routers import customers, plan, membership, attendance, sale, payment, cash
 
 
 @asynccontextmanager
@@ -21,6 +21,10 @@ app.include_router(membership.router)
 app.include_router(attendance.router)
 
 app.include_router(sale.router)
+
+app.include_router(payment.router)
+
+app.include_router(cash.router)
 
 
 @app.get("/")

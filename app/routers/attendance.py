@@ -12,10 +12,9 @@ router = APIRouter(prefix="/attendances", tags=["attendances"])
 @router.post("/checkin", response_model=AttendancePublic)
 def check_in(
     data: AttendanceCreate,
-    service: AttendanceServiceDep,
-    daily_membership: bool = Query(default=False)
+    service: AttendanceServiceDep
 ):
-    return service.check_in(data, daily_membership)
+    return service.check_in(data)
 
 # UPDATE (Check-out)
 

@@ -7,18 +7,29 @@ from app.models.product import Product
 from app.models.sale import Sale, SaleDetail
 from app.models import Plan
 from app.models.customers import Customer
-from app.schemes.sale import SaleCreate
+from app.schemes.sale import SaleCreate, SaleResume
 from app.utilities.exceptions import not_found, conflict
 from typing import Annotated
+from app.services.membership import MembershipService
+from app.services.customer import CustomerService, CustomerServiceDep
 
 
 class SaleService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, customer_service: CustomerService):
         self.session = session
+        self.customer_service = customer_service
+
+    def get_sale(self, sale_id: int) -> Sale:
+        db_sale = self.session.get(Sale, sale_id)
+
+        if not db_sale:
+            raise not_found("sale")
+
+        return db_sale
 
     def create_sale(self, sale: SaleCreate) -> Sale:
 
-        db_customer = self.session.get(Customer, sale.customer_id)
+        db_customer = self.customer_service.get_customer(sale.nuip)
 
         if not db_customer:
             raise not_found("customer")
@@ -43,10 +54,12 @@ class SaleService:
                 self.session.add(product)
 
             elif d.item_type == "PLAN":
-                # aquí deberías obtener la membresía desde la BD
-                # por ejemplo: membership = self.session.get(Membership, d["item_id"])
-                # unit_price = membership.plan.amount
-                # para simplificar, supongamos que membership tiene un campo "price"
+                membership = self.customer_service.get_active_membership(
+                    db_customer.memberships)
+
+                if membership:
+                    raise conflict("customer already has a membership")
+
                 plan = self.session.get(Plan, d.item_id)
                 if not plan:
                     raise not_found("plan")
@@ -68,7 +81,8 @@ class SaleService:
 
         # crear cabecera
         sale = Sale(
-            customer_id=sale.customer_id,
+            customer_id=db_customer.customer_id,
+            nuip=db_customer.nuip,
             total=total_amount,
             details=sale_details
         )
@@ -83,15 +97,26 @@ class SaleService:
         statement = select(Sale).where(Sale.customer_id == customer_id)
         return self.session.exec(statement).all()
 
-    def get_sale_details(self, sale_id: int) -> list[SaleDetail]:
+    def get_sale_resume(self, sale_id: int) -> SaleResume:
         """Obtiene el detalle de una venta específica."""
-        statement = select(SaleDetail).where(
-            SaleDetail.sale_id == sale_id)
-        return self.session.exec(statement).all()
+        db_sale = self.get_sale(sale_id)
+
+        return SaleResume(
+            sale_id=db_sale.sale_id,
+            nuip=db_sale.nuip,
+            total=db_sale.total,
+            status=db_sale.status,
+            created_at=db_sale.created_at,
+            pending_amout=self.get_pending_amount(db_sale),
+            details=db_sale.details
+        )
+
+    def get_pending_amount(self, sale: Sale) -> int:
+        return sale.total - sum(p.amount for p in sale.payments)
 
 
-def get_sale_service(session: SessionDep) -> SaleService:
-    return SaleService(session)
+def get_sale_service(session: SessionDep, customer_service: CustomerServiceDep) -> SaleService:
+    return SaleService(session, customer_service)
 
 
 SaleServiceDep = Annotated[SaleService, Depends(get_sale_service)]

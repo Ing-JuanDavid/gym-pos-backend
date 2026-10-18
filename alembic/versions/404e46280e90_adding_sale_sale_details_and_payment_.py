@@ -1,19 +1,19 @@
-"""adding sale, saledetail, payment and cashmovement tables
+"""adding sale, sale details and payment tables
 
-Revision ID: d37fb5f4c400
+Revision ID: 404e46280e90
 Revises: ec08eefba28d
-Create Date: 2026-10-14 20:55:24.958081
+Create Date: 2026-10-15 11:48:18.203488
 
 """
 from typing import Sequence, Union
 
 from alembic import op
-import sqlmodel
 import sqlalchemy as sa
+import sqlmodel
 from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = 'd37fb5f4c400'
+revision: str = '404e46280e90'
 down_revision: Union[str, Sequence[str], None] = 'ec08eefba28d'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -39,6 +39,8 @@ def upgrade() -> None:
                     sa.Column('sale_id', sa.Integer(), nullable=False),
                     sa.Column('total', sa.Integer(), nullable=True),
                     sa.Column('created_at', sa.DateTime(), nullable=True),
+                    sa.Column('status', sa.Enum('PAGADA', 'PARCIAL',
+                                                'PENDIENTE', name='salestatus'), nullable=False),
                     sa.Column('customer_id', sa.Integer(), nullable=False),
                     sa.ForeignKeyConstraint(
                         ['customer_id'], ['customer.customer_id'], ),
@@ -62,7 +64,8 @@ def upgrade() -> None:
                     sa.Column('quantity', sa.Integer(), nullable=False),
                     sa.Column('unit_price', sa.Integer(), nullable=False),
                     sa.Column('sale_id', sa.Integer(), nullable=False),
-                    sa.ForeignKeyConstraint(['sale_id'], ['sale.sale_id'], ),
+                    sa.ForeignKeyConstraint(
+                        ['sale_id'], ['sale.sale_id'], ondelete='CASCADE'),
                     sa.PrimaryKeyConstraint('id')
                     )
     op.alter_column('attendance', 'check_in',

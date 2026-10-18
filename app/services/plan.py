@@ -22,8 +22,12 @@ class PlanService:
         return db_plan
 
     # READ (por id)
-    def get_plan(self, plan_id: int) -> Plan | None:
-        return self.session.get(Plan, plan_id)
+    def get_plan(self, plan_id: int) -> Plan:
+        db_plan = self.session.get(Plan, plan_id)
+
+        if not db_plan:
+            raise not_found("plan")
+        return db_plan
 
     # READ (todos)
     def list_plans(self) -> list[PlanPublic]:
@@ -34,8 +38,6 @@ class PlanService:
     def update_plan(self, plan_id: int, plan: PlanUpdate) -> PlanPublic | None:
         db_plan = self.get_plan(plan_id)
 
-        if not db_plan:
-            raise not_found("plan")
         plan_data = plan.model_dump(exclude_unset=True)
 
         db_plan.sqlmodel_update(plan_data)
@@ -47,8 +49,6 @@ class PlanService:
     # DELETE
     def delete_plan(self, plan_id: int) -> bool:
         db_plan = self.get_plan(plan_id)
-        if not db_plan:
-            return False
         self.session.delete(db_plan)
         self.session.commit()
         return True
