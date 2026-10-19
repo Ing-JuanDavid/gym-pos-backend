@@ -36,7 +36,7 @@ def get_membership(
 
 
 @router.get("/customer/{nuip}", response_model=MembershipPublic | None)
-def get_customer_membership(
+def get_active_customer_membership(
     nuip: int,
     service: MembershipServiceDep
 ):
@@ -47,9 +47,10 @@ def get_customer_membership(
 
 @router.get("/", response_model=list[MembershipPublic])
 def list_memberships(
-    service: MembershipServiceDep
+    service: MembershipServiceDep,
+    active: bool | None = None
 ):
-    return service.list_memberships()
+    return service.list_memberships(active)
 
 # UPDATE
 

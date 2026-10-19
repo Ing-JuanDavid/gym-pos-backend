@@ -1,5 +1,5 @@
 from app.database import Session, SessionDep
-from sqlmodel import select
+from sqlmodel import select, desc
 from fastapi import HTTPException, Depends
 from datetime import datetime
 
@@ -92,9 +92,16 @@ class SaleService:
 
         return sale
 
-    def get_sales_by_customer(self, customer_id: int) -> list[Sale]:
+    def get_sales_by_customer(self, nuip: int) -> list[Sale]:
         """Obtiene todos las ventas de un cliente."""
-        statement = select(Sale).where(Sale.customer_id == customer_id)
+
+        db_customer = self.customer_service.get_customer(nuip)
+
+        if not db_customer:
+            raise not_found("customer")
+
+        statement = select(Sale).where(
+            Sale.customer_id == db_customer.customer_id).order_by(desc(Sale.created_at))
         return self.session.exec(statement).all()
 
     def get_sale_resume(self, sale_id: int) -> SaleResume:
@@ -110,6 +117,16 @@ class SaleService:
             pending_amout=self.get_pending_amount(db_sale),
             details=db_sale.details
         )
+
+    def delete_sale(self, sale_id: int) -> bool:
+        db_sale = self.get_sale(sale_id)
+
+        if len(db_sale.payments) > 0:
+            raise conflict("sale already has payments")
+
+        self.session.delete(db_sale)
+        self.session.commit()
+        return True
 
     def get_pending_amount(self, sale: Sale) -> int:
         return sale.total - sum(p.amount for p in sale.payments)

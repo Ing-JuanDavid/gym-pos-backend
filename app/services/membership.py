@@ -52,8 +52,12 @@ class MembershipService:
         return active_membership
 
     # READ (todos)
-    def list_memberships(self) -> list[MembershipPublic]:
+    def list_memberships(self, active: bool | None) -> list[MembershipPublic]:
         statement = select(Membership)
+
+        if active != None:
+            statement = statement.where(Membership.status == active)
+
         return list(self.session.exec(statement))
 
     # UPDATE

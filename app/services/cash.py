@@ -1,10 +1,11 @@
 from app.database import Session, SessionDep
-from sqlmodel import select
+from sqlmodel import select, or_, between
 from typing import List, Optional
 from app.models.cash import CashSession
 from datetime import datetime, time
 from fastapi import Depends
 from typing import Annotated
+from app.utilities.exceptions import conflict, not_found
 
 
 class CashSessionService:
@@ -13,6 +14,13 @@ class CashSessionService:
 
     # Crear sesión de caja
     def open(self, opening_balance: int = 0) -> CashSession:
+
+        current_cash = self.get_current_cash()
+
+        if current_cash:
+            raise conflict(
+                f"cash with id: {current_cash.session_id} alerady opened")
+
         session = CashSession(opening_balance=opening_balance)
         self.session.add(session)
         self.session.commit()
@@ -31,8 +39,12 @@ class CashSessionService:
         statement = (
             select(CashSession)
             .where(
-                CashSession.opened_at >= start_of_day,
-                CashSession.opened_at <= end_of_day
+                or_(
+                    (
+                        CashSession.opened_at >= start_of_day) & (
+                        CashSession.opened_at <= end_of_day),
+                    CashSession.closed_at == None
+                )
             )
         )
         return self.session.exec(statement).first()
@@ -46,7 +58,10 @@ class CashSessionService:
     def close(self, session_id: int, closing_balance: int) -> Optional[CashSession]:
         session = self.get(session_id)
         if not session:
-            return None
+            raise not_found("session")
+
+        if session.closed_at != None:
+            raise conflict("cash alerady closed")
         session.closing_balance = closing_balance
         session.closed_at = datetime.now()
         self.session.add(session)

@@ -11,12 +11,12 @@ async def create_sale(sale: SaleCreate, service: SaleServiceDep):
     return service.create_sale(sale)
 
 
-@router.get("/customer/{customer_id}", response_model=list[Sale])
+@router.get("/customer/{nuip}", response_model=list[Sale])
 def get_sales_by_customer(
-    customer_id: int,
+    nuip: int,
     service: SaleServiceDep
 ):
-    return service.get_sales_by_customer(customer_id)
+    return service.get_sales_by_customer(nuip)
 
 
 @router.get("/{sale_id}/resume", response_model=SaleResume)

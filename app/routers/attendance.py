@@ -9,22 +9,22 @@ router = APIRouter(prefix="/attendances", tags=["attendances"])
 # CREATE (Check-in)
 
 
-@router.post("/checkin", response_model=AttendancePublic)
+@router.post("/customer/{nuip}/checkin", response_model=AttendancePublic)
 def check_in(
-    data: AttendanceCreate,
+    nuip: int,
     service: AttendanceServiceDep
 ):
-    return service.check_in(data)
+    return service.check_in(nuip)
 
 # UPDATE (Check-out)
 
 
-@router.put("/{attendance_id}/checkout", response_model=AttendancePublic | None)
+@router.patch("/customer/{nuip}/checkout", response_model=AttendancePublic)
 def check_out(
-    attendance_id: int,
+    nuip: int,
     service: AttendanceServiceDep
 ):
-    return service.check_out(attendance_id)
+    return service.check_out(nuip)
 
 # READ (por id)
 
@@ -39,9 +39,9 @@ def get_attendance(
 # READ (historial por cliente)
 
 
-@router.get("/current/customer/{customer_id}", response_model=AttendancePublic | None)
-async def get_current_attendance(customer_id: int, service: AttendanceServiceDep, customer_service: CustomerServiceDep):
-    db_customer = customer_service.get_customer_id(customer_id)
+@router.get("/current/customer/{nuip}", response_model=AttendancePublic | None)
+async def get_pending_attendance(nuip: int, service: AttendanceServiceDep, customer_service: CustomerServiceDep):
+    db_customer = customer_service.get_customer(nuip)
 
     if not db_customer:
         raise not_found("customer")
@@ -49,12 +49,12 @@ async def get_current_attendance(customer_id: int, service: AttendanceServiceDep
     return service.get_current_attendance(db_customer)
 
 
-@router.get("/customer/{customer_id}", response_model=list[AttendancePublic])
+@router.get("/customer/{nuip}", response_model=list[AttendancePublic])
 def list_customer_attendances(
-    customer_id: int,
+    nuip: int,
     service: AttendanceServiceDep
 ):
-    return service.list_customer_attendances(customer_id)
+    return service.list_customer_attendances(nuip)
 
 # READ (todos)
 

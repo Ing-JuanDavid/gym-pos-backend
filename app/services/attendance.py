@@ -21,10 +21,10 @@ class AttendanceService:
         self.membership_service = membership_service
 
     # CREATE (Check-in)
-    def check_in(self, data: AttendanceCreate) -> AttendancePublic:
+    def check_in(self, nuip: int) -> AttendancePublic:
 
         #  check the customer and membership
-        db_customer = self.customer_service.get_customer(data.nuip)
+        db_customer = self.customer_service.get_customer(nuip)
 
         if not db_customer:
             raise not_found("customer")
@@ -49,10 +49,17 @@ class AttendanceService:
         return attendance
 
     # UPDATE (Check-out)
-    def check_out(self, attendance_id: int) -> AttendancePublic | None:
-        db_attendance = self.session.get(Attendance, attendance_id)
+    def check_out(self, nuip: int) -> AttendancePublic:
+
+        db_customer = self.customer_service.get_customer(nuip)
+
+        if not db_customer:
+            raise not_found("customer")
+
+        db_attendance = self.get_current_attendance(db_customer)
+
         if not db_attendance:
-            return None
+            raise conflict("user hasn't attended yet")
 
         db_attendance.check_out = datetime.now()
         self.session.add(db_attendance)
@@ -65,14 +72,20 @@ class AttendanceService:
         return self.session.get(Attendance, attendance_id)
 
     # READ (historial por cliente)
-    def list_customer_attendances(self, customer_id: int) -> list[AttendancePublic]:
+    def list_customer_attendances(self, nuip: int) -> list[AttendancePublic]:
+
+        db_customer = self.customer_service.get_customer(nuip)
+
+        if not db_customer:
+            raise not_found("customer")
+
         statement = select(Attendance).where(
-            Attendance.customer_id == customer_id).order_by(desc(Attendance.check_in))
+            Attendance.customer_id == db_customer.customer_id).order_by(desc(Attendance.check_in))
         return list(self.session.exec(statement))
 
-    # READ (todos)
+    # READ (ALL)
     def list_attendances(self) -> list[AttendancePublic]:
-        statement = select(Attendance)
+        statement = select(Attendance).order_by(desc(Attendance.check_in))
         return list(self.session.exec(statement))
 
     # DELETE
