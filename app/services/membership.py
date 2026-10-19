@@ -28,7 +28,7 @@ class MembershipService:
 
         new_membership = Membership.model_validate(data)
         new_membership.start_date = date.today()
-        time_delta = timedelta(days=db_plan.duration)
+        time_delta = timedelta(days=db_plan.duration-1)
         new_membership.end_date = new_membership.start_date+time_delta
         # set ending date by calculing form duration
         self.session.add(new_membership)

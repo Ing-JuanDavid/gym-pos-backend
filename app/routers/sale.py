@@ -25,3 +25,14 @@ def get_sale_resume(
     service: SaleServiceDep
 ):
     return service.get_sale_resume(sale_id)
+
+
+@router.delete("/{sale_id}", response_model=dict[str, str])
+def delete_sale(
+    sale_id: int,
+    service: SaleServiceDep
+):
+
+    if not service.delete_sale(sale_id):
+        return {"message": "error"}
+    return {"message": "ok"}

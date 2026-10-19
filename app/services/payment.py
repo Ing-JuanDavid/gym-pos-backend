@@ -20,9 +20,18 @@ from app.schemes.membership import MembershipCreate
 from app.services.plan import PlanService, PlanServiceDep
 from app.models.plan import Plan
 
+from app.models.product import Product
+
 
 class PaymentService:
-    def __init__(self, session: Session, sale_service: SaleService, cash_movement_service: CashMovementService, membership_service: MembershipService, plan_service: PlanService):
+    def __init__(
+        self,
+        session: Session,
+        sale_service: SaleService,
+        cash_movement_service: CashMovementService,
+        membership_service: MembershipService,
+        plan_service: PlanService
+    ):
         self.session = session
         self.sale_service = sale_service
         self.cash_movement_service = cash_movement_service
@@ -41,8 +50,6 @@ class PaymentService:
             if payment.amount > pending_amount:
                 raise conflict("invald amount")
 
-            plan = self.get_plan_from_details(db_sale.details)
-
             # payment
             db_payment = Payment(
                 amount=payment.amount,
@@ -54,15 +61,8 @@ class PaymentService:
             pending_amount -= payment.amount
             db_sale.status = SaleStatus.PAGADA if pending_amount == 0 else SaleStatus.PARCIAL
 
-            if db_sale.status == SaleStatus.PAGADA and plan:
-
-                self.membership_service.create_membership(
-                    MembershipCreate(
-                        customer_id=db_sale.customer_id,
-                        plan_id=plan.plan_id,
-                    )
-                )
-
+            if db_sale.status == SaleStatus.PAGADA:
+                self.confirm_purchase(db_sale)
             #  create a cash movmeent
             self.cash_movement_service.create_movement(
                 db_payment.amount, db_payment.payment_method, MovementType.ENTRADA)
@@ -86,6 +86,25 @@ class PaymentService:
                 return self.plan_service.get_plan(d.item_id)
 
         return None
+
+    def confirm_purchase(self, sale: Sale):
+        for d in sale.details:
+            if d.item_type == "PRODUCT":
+                db_product = self.session.get(Product, d.item_id)
+
+                if not db_product:
+                    raise not_found("product")
+
+                db_product.stock -= d.quantity
+
+            elif d.item_type == "PLAN":
+                db_plan = self.plan_service.get_plan(d.item_id)
+                db_membership = self.membership_service.create_membership(
+                    MembershipCreate(
+                        customer_id=sale.customer_id,
+                        plan_id=db_plan.plan_id,
+                    )
+                )
 
 
 def get_payment_service(session: SessionDep, sale_service: SaleServiceDep, cash_movement_service: CashMovementServiceDep, membership_service: MembershipServiceDep, plan_service: PlanServiceDep) -> PaymentService:

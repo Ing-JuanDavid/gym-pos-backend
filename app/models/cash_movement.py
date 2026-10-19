@@ -17,4 +17,5 @@ class CashMovement(SQLModel, table=True):
     movement_type: MovementType
     create_at: datetime | None = Field(sa_column=Column(DateTime(timezone=False)),
                                        default_factory=datetime.now)
-    session_id: int = Field(foreign_key="cashsession.session_id")
+    session_id: int = Field(
+        foreign_key="cashsession.session_id", ondelete="CASCADE")

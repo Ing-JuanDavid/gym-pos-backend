@@ -64,6 +64,8 @@ class CashSessionService:
             raise conflict("cash alerady closed")
         session.closing_balance = closing_balance
         session.closed_at = datetime.now()
+        session.total_balance = sum(m.amount for m in session.movements)
+        session.difference = session.total_balance - session.closing_balance
         self.session.add(session)
         self.session.commit()
         self.session.refresh(session)

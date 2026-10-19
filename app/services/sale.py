@@ -49,10 +49,6 @@ class SaleService:
                 unit_price = product.price
                 total_amount += d.quantity * unit_price
 
-                # disminuir stock
-                product.stock -= d.quantity
-                self.session.add(product)
-
             elif d.item_type == "PLAN":
                 membership = self.customer_service.get_active_membership(
                     db_customer.memberships)
@@ -121,7 +117,7 @@ class SaleService:
     def delete_sale(self, sale_id: int) -> bool:
         db_sale = self.get_sale(sale_id)
 
-        if len(db_sale.payments) > 0:
+        if db_sale.status != "PENDIENTE":
             raise conflict("sale already has payments")
 
         self.session.delete(db_sale)
