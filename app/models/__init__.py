@@ -6,3 +6,4 @@ from .attendance import Attendance
 from .payment import Payment, PaymentMethod
 from .sale import Sale, SaleDetail, SaleStatus
 from .cash_movement import CashMovement, MovementType
+from .fingerprint import Fingerprint

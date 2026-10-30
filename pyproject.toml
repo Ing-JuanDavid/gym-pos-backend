@@ -8,6 +8,7 @@ dependencies = [
     "fastapi[standard]>=0.142.2",
     "psycopg[binary]==3.3.4",
     "sqlmodel>=0.0.47",
+    "websockets>=17.2",
 ]
 [tool.fastapi]
 entrypoint = "app.main:app"

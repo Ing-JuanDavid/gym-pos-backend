@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlmodel import Session
 from app.database import create_db_and_tables, boostrapt_db, engine
-from app.routers import customers, plan, membership, attendance, sale, payment, cash
+from app.routers import customers, plan, membership, attendance, sale, payment, cash, devices
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.jobs import expire_memberships
 from datetime import datetime
@@ -45,6 +45,9 @@ app.include_router(sale.router)
 app.include_router(payment.router)
 
 app.include_router(cash.router)
+
+
+app.include_router(devices.router)
 
 
 @app.get("/")
