@@ -25,8 +25,9 @@ async def lifespan(app: FastAPI):
     # create_db_and_tables()
     # boostrapt_db()
     # Job 1: expira membresías cada día a medianoche
-    scheduler.add_job(job_expire, "cron", hour=6, minute=00)
-    scheduler.start()
+    # scheduler.add_job(job_expire, "cron", hour=6, minute=00)
+    # scheduler.start()
+    job_expire()
     yield
     scheduler.shutdown()
 

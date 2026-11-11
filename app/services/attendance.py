@@ -7,7 +7,7 @@ from app.models.attendance import Attendance
 from app.models.customers import Customer
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.services.membership import MembershipService, MembershipServiceDep
-from app.schemes.attendance import AttendanceCreate, AttendanceUpdate, AttendancePublic
+from app.schemes.attendance import AttendanceCreate, AttendanceUpdate, AttendancePublic, AttendanceResponse, AttendanceResult
 from sqlmodel import select, desc
 from app.utilities.exceptions import not_found, conflict
 
@@ -110,6 +110,47 @@ class AttendanceService:
 
         db_attendance = self.session.exec(statement).first()
         return db_attendance
+
+    # CREATE (Check-in)
+    def register_attendance(self, nuip: int) -> AttendanceResponse:
+
+        response = AttendanceResponse(status=AttendanceResult.ERROR)
+        self.session.expire_all()
+
+        #  check the customer and membership
+        db_customer = self.customer_service.get_customer(nuip)
+
+        if not db_customer:
+            response.status = AttendanceResult.CUSTOMER_NOT_FOUND
+            return response
+
+        response.customer_id = db_customer.customer_id
+
+        active_membership = self.customer_service.get_active_membership(
+            db_customer.memberships)
+
+        if not active_membership:
+            response.status = AttendanceResult.MEMBERSHIP_NOT_FOUND
+            return response
+
+        # check current attendance
+        if (self.get_current_attendance(db_customer)):
+            response.attendance_id = self.check_out(nuip).id
+            response.status = AttendanceResult.CHECK_OUT
+            return response
+
+        attendance = Attendance(
+            customer_id=db_customer.customer_id,
+            membership_id=active_membership.membership_id,
+        )
+        self.session.add(attendance)
+        self.session.commit()
+        self.session.refresh(attendance)
+
+        response.status = AttendanceResult.CHECK_IN
+        response.attendance_id = attendance.id
+
+        return response
 
 
 def get_attendance_service(session: SessionDep, customer_service: CustomerServiceDep, membership_service: MembershipServiceDep) -> AttendanceService:

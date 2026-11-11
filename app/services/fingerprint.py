@@ -5,6 +5,7 @@ from app.utilities.exceptions import conflict
 from app.schemes.fingerprint import FingerPrintCreate
 from fastapi import Depends
 from typing import Annotated
+from sqlmodel import select
 
 
 class FingerPrintService:
@@ -42,6 +43,26 @@ class FingerPrintService:
             raise conflict("prints full")
 
         return fingerprint_id + 1
+
+    def get_fingerprint_by_print_id(
+        self,
+        print_id: int,
+    ) -> Fingerprint | None:
+
+        statement = (
+            select(Fingerprint)
+            .where(
+                Fingerprint.print_id == print_id
+            )
+        )
+
+        return self.session.exec(
+            statement
+        ).first()
+
+    def delete_fingerprint(self, fingerprint: Fingerprint) -> None:
+        self.session.delete(fingerprint)
+        self.session.commit()
 
 
 def get_fingerprint_service(session: SessionDep):
