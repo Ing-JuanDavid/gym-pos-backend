@@ -1,16 +1,22 @@
 from app.services.customer import CustomerService
 import asyncio
+import json
 
 from collections import defaultdict, deque
+from datetime import datetime
+from pathlib import Path
+from uuid import uuid4
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Request, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
 from app.services.customer import CustomerServiceDep
 from app.services.fingerprint import FingerPrintServiceDep
 from app.utilities.exceptions import not_found
 from app.schemes.fingerprint import FingerPrintCreate
 from app.services.attendance import AttendanceServiceDep, AttendanceResult
+from app.services.customer_photo import CustomerPhotoServiceDep      # <-- ajustar ruta
+from app.schemes.customer_photo import CustomerPhotoCreate           # <-- ajustar ruta
 
 router = APIRouter(prefix="/devices", tags=["Devices"])
 
@@ -19,6 +25,14 @@ commands = defaultdict(deque)
 
 # Segundos que se espera la respuesta del ESP32 al eliminar una huella.
 DELETE_TIMEOUT = 10
+
+# Captura de fotos con el ESP32-CAM
+CAPTURE_TIMEOUT = 15                       # segundos esperando la imagen
+MAX_IMAGE_BYTES = 5 * 1024 * 1024          # 5 MB de seguridad
+# carpeta donde se guardan los archivos
+CAPTURES_DIR = Path("media/captures")
+# prefijo de la URL que se guarda en la BD
+CAPTURES_URL = "/media/captures"
 
 
 class CommandCreate(BaseModel):
@@ -35,11 +49,20 @@ class AttendanceRequest(BaseModel):
     device_id: str = "esp-32"
 
 
+class CaptureRequest(BaseModel):
+    device_id: str = "esp-cam"
+    customer_nuip: int
+
+
 pending_enrollments: dict[int, dict] = {}
 
 # print_id -> Future que se resuelve cuando el ESP32 responde
 # DELETE_SUCCESS o DELETE_FAILED.
 pending_deletions: dict[int, asyncio.Future] = {}
+
+# device_id -> Future que se resuelve cuando el ESP32-CAM envía la imagen
+# (o informa un fallo). Solo se permite una captura a la vez por dispositivo.
+pending_captures: dict[str, asyncio.Future] = {}
 
 
 # first realtime comunication method by using only http
@@ -179,7 +202,7 @@ async def device_websocket(
                 ]
 
                 db_fingerprint = (
-                    fingerprint_service.get_fingerprint_by_print_id(
+                    fingerprint_service.get_by_print_id(
                         fingerprint_id
                     )
                 )
@@ -252,6 +275,54 @@ async def device_websocket(
             device_id,
             websocket,
         )
+
+
+def _resolve_capture(
+    device_id: str,
+    image: bytes | None = None,
+    error: str | None = None,
+):
+    """Despierta al endpoint que espera la foto del ESP32-CAM."""
+    future = pending_captures.get(device_id)
+
+    if future is None or future.done():
+        return
+
+    if image is not None:
+        future.set_result({"ok": True, "image": image})
+    else:
+        future.set_result({"ok": False, "reason": error or "UNKNOWN"})
+
+
+@router.websocket("/ws/cam/{device_id}")
+async def camera_websocket(websocket: WebSocket, device_id: str):
+    """
+    WebSocket del ESP32-CAM (órdenes y eventos, en JSON).
+    La imagen NO viaja por aquí: el ESP32-CAM la sube por HTTP a
+    POST /devices/captures/upload/{device_id}.
+    """
+    await manager.connect(device_id, websocket)
+
+    try:
+        while True:
+            message = await websocket.receive()
+
+            if message["type"] == "websocket.disconnect":
+                break
+
+            if message.get("text") is not None:
+                try:
+                    data = json.loads(message["text"])
+                except json.JSONDecodeError:
+                    continue
+
+                print(f"[WS-CAM] {device_id} -> {data}")
+
+                if data.get("type") == "CAPTURE_FAILED":
+                    _resolve_capture(device_id, error=data.get("status"))
+
+    finally:
+        manager.disconnect(device_id, websocket)
 
 
 @router.post("/commands")
@@ -399,6 +470,131 @@ async def delete_fingerprint(
         "message": "Huella eliminada",
         "customer_nuip": customer_nuip,
         "fingerprint_id": print_id,
+    }
+
+
+async def _capture_on_device(device_id: str) -> dict:
+    """
+    Envía CAPTURE al ESP32-CAM y espera la imagen.
+    Devuelve {"ok": True, "image": bytes} o {"ok": False, "reason": str}.
+    Lanza HTTPException si no está conectado o no responde.
+    """
+    if device_id in pending_captures:
+        raise HTTPException(
+            status_code=409,
+            detail="Ya hay una captura en curso en este dispositivo",
+        )
+
+    future = asyncio.get_running_loop().create_future()
+    pending_captures[device_id] = future
+
+    try:
+        sent = await manager.send_command(
+            device_id=device_id,
+            command={"type": "CAPTURE"},
+        )
+
+        if not sent:
+            raise HTTPException(
+                status_code=409,
+                detail="Dispositivo desconectado",
+            )
+
+        try:
+            return await asyncio.wait_for(future, timeout=CAPTURE_TIMEOUT)
+        except asyncio.TimeoutError:
+            raise HTTPException(
+                status_code=504,
+                detail="La cámara no respondió a tiempo",
+            )
+
+    finally:
+        pending_captures.pop(device_id, None)
+
+
+@router.post("/captures/upload/{device_id}")
+async def upload_capture(device_id: str, request: Request):
+    """
+    Lo llama el ESP32-CAM con el JPEG como cuerpo de la petición.
+    Solo se acepta si hay una captura pendiente para ese dispositivo.
+    """
+    if device_id not in pending_captures:
+        raise HTTPException(
+            status_code=409,
+            detail="No hay una captura pendiente para este dispositivo",
+        )
+
+    image = await request.body()
+
+    if len(image) > MAX_IMAGE_BYTES:
+        raise HTTPException(status_code=413, detail="Imagen demasiado grande")
+
+    print(f"[CAM-UPLOAD] {device_id} -> {len(image)} bytes")
+
+    _resolve_capture(device_id, image=image)
+
+    return {"message": "Imagen recibida", "size": len(image)}
+
+
+@router.post("/captures")
+async def capture_customer_photo(
+    request: CaptureRequest,
+    customer_service: CustomerServiceDep,
+    photo_service: CustomerPhotoServiceDep,
+):
+    db_customer = customer_service.get_customer(request.customer_nuip)
+
+    if not db_customer:
+        raise not_found("customer")
+
+    result = await _capture_on_device(request.device_id)
+
+    if not result["ok"]:
+        raise HTTPException(
+            status_code=502,
+            detail=f"La cámara no pudo capturar la imagen: {result['reason']}",
+        )
+
+    image: bytes = result["image"]
+
+    # Validaciones básicas: tamaño y cabecera JPEG (FF D8)
+    if len(image) > MAX_IMAGE_BYTES or image[:2] != b"\xff\xd8":
+        raise HTTPException(
+            status_code=502,
+            detail="La imagen recibida no es un JPEG válido",
+        )
+
+    # 1) Guardar el archivo en la carpeta
+    CAPTURES_DIR.mkdir(parents=True, exist_ok=True)
+
+    filename = (
+        f"customer_{db_customer.customer_id}_"
+        f"{datetime.now():%Y%m%d_%H%M%S}_{uuid4().hex[:8]}.jpg"
+    )
+    file_path = CAPTURES_DIR / filename
+
+    await asyncio.to_thread(file_path.write_bytes, image)
+
+    # 2) Guardar solo la URL en la base de datos
+    url = f"{CAPTURES_URL}/{filename}"
+
+    try:
+        db_photo = photo_service.create_photo(
+            CustomerPhotoCreate(
+                url=url,
+                customer_id=db_customer.customer_id,
+            )
+        )
+    except Exception:
+        # Si falla la BD, no dejar el archivo huérfano
+        file_path.unlink(missing_ok=True)
+        raise
+
+    return {
+        "message": "Foto capturada",
+        "customer_nuip": request.customer_nuip,
+        "photo_id": db_photo.id,
+        "url": url,
     }
 
 

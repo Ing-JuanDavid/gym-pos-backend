@@ -7,6 +7,11 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.jobs import expire_memberships
 from datetime import datetime
 
+from pathlib import Path
+from fastapi.staticfiles import StaticFiles
+
+Path("media/captures").mkdir(parents=True, exist_ok=True)
+
 
 scheduler = BackgroundScheduler()
 
@@ -49,6 +54,8 @@ app.include_router(cash.router)
 
 
 app.include_router(devices.router)
+
+app.mount("/media", StaticFiles(directory="media"), name="media")
 
 
 @app.get("/")
