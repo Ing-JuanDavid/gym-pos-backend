@@ -1,5 +1,5 @@
 
-from fastapi import WebSocket, WebSocketDisconnect
+from fastapi import WebSocket, WebSocketDisconnect, HTTPException
 import asyncio
 
 
@@ -39,6 +39,23 @@ class DeviceConnectionManager:
         except (RuntimeError, WebSocketDisconnect):
             self.disconnect(device_id, websocket)
             return False
+
+    async def send_device_command(
+        self,
+        device_id: str,
+        command: dict,
+    ):
+
+        sent = await manager.send_command(
+            device_id=device_id,
+            command=command,
+        )
+
+        if not sent:
+            raise HTTPException(
+                status_code=409,
+                detail="Dispositivo desconectado",
+            )
 
 
 def get_device_connection_manager() -> DeviceConnectionManager:
