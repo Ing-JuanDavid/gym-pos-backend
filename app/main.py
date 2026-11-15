@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     # scheduler.start()
     job_expire()
     yield
-    scheduler.shutdown()
+    # scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
 
