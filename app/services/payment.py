@@ -1,5 +1,5 @@
 from app.database import Session, SessionDep
-from sqlmodel import select
+from sqlmodel import select, desc
 from fastapi import HTTPException, Depends
 from datetime import datetime
 from typing import Optional
@@ -37,6 +37,11 @@ class PaymentService:
         self.cash_movement_service = cash_movement_service
         self.membership_service = membership_service
         self.plan_service = plan_service
+
+    def get_payments(self) -> list[Payment]:
+
+        statement = select(Payment).order_by(desc(Payment.created_at))
+        return self.session.exec(statement).all()
 
     def create_payment(self, sale_id: int, payment: PaymentCreate) -> Payment:
         try:

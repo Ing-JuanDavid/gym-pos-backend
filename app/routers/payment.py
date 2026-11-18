@@ -7,6 +7,11 @@ from app.services.payment import PaymentService, PaymentServiceDep
 router = APIRouter(prefix="/payments", tags=["payments"])
 
 
+@router.get("", response_model=list[Payment])
+async def get_payments(service: PaymentServiceDep):
+    return service.get_payments()
+
+
 # Crear un pago
 @router.post("/", response_model=Payment)
 def create_payment(

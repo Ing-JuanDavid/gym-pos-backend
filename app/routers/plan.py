@@ -15,7 +15,7 @@ async def create_plan(service: PlanServiceDep, plan: PlanCreate):
     return service.create_plan(plan)
 
 
-@router.patch("/{plan_id}", response_model=PlanUpdate)
+@router.patch("/{plan_id}", response_model=PlanPublic)
 async def update_plan(service: PlanServiceDep, customer: PlanUpdate, plan_id: int = Path(gt=0)):
     return service.update_plan(plan_id, customer)
 

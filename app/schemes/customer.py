@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 from datetime import date
+from datetime import datetime
 
 
 class CustomerCreate(BaseModel):
@@ -23,3 +24,5 @@ class CustomerUpdate(BaseModel):
 
 class CustomerPublic(CustomerCreate):
     customer_id: int
+    membership_name: str | None = None
+    last_attendance: datetime | None = None

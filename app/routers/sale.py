@@ -6,6 +6,11 @@ from app.services.sale import SaleServiceDep
 router = APIRouter(prefix="/sales", tags=["sales"])
 
 
+@router.get("", response_model=list[Sale])
+async def get_sales(service: SaleServiceDep):
+    return service.list_sales()
+
+
 @router.post("", response_model=Sale)
 async def create_sale(sale: SaleCreate, service: SaleServiceDep):
     return service.create_sale(sale)
@@ -25,6 +30,14 @@ def get_sale_resume(
     service: SaleServiceDep
 ):
     return service.get_sale_resume(sale_id)
+
+
+@router.get("/{sale_id}", response_model=Sale)
+def get_sale(
+    sale_id: int,
+    service: SaleServiceDep
+):
+    return service.get_sale(sale_id)
 
 
 @router.delete("/{sale_id}", response_model=dict[str, str])

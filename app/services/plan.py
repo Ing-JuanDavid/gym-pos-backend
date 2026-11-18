@@ -1,6 +1,6 @@
 
 from app.database import Session, SessionDep
-from sqlmodel import select
+from sqlmodel import select, asc
 from app.models.plan import Plan  # tu modelo SQLModel
 from app.schemes.plan import PlanCreate, PlanPublic, PlanUpdate
 from app.utilities.exceptions import not_found
@@ -31,7 +31,7 @@ class PlanService:
 
     # READ (todos)
     def list_plans(self) -> list[PlanPublic]:
-        statement = select(Plan)
+        statement = select(Plan).order_by(asc(Plan.duration))
         return list(self.session.exec(statement))
 
     # UPDATE

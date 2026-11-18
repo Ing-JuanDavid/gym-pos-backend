@@ -10,7 +10,7 @@ class Membership(SQLModel, table=True):
     end_date: date | None = Field(default=None)
     customer_id: int = Field(
         foreign_key="customer.customer_id", ondelete="CASCADE")
-    plan_id: int = Field(foreign_key="plan.plan_id")
+    plan_id: int = Field(foreign_key="plan.plan_id", ondelete="CASCADE")
 
     customer: Optional["Customer"] = Relationship(back_populates="memberships")
 

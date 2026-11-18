@@ -6,6 +6,7 @@ from app.routers import customers, devices_ws, plan, membership, attendance, sal
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.jobs import expire_memberships
 from datetime import datetime
+from fastapi.middleware.cors import CORSMiddleware
 
 from pathlib import Path
 from fastapi.staticfiles import StaticFiles
@@ -37,6 +38,14 @@ async def lifespan(app: FastAPI):
     # scheduler.shutdown()
 
 app = FastAPI(lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 app.include_router(customers.router)

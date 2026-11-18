@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from app.database import get_session
 from app.services.membership import MembershipService, MembershipServiceDep
-from app.schemes.membership import MembershipCreate, MembershipUpdate, MembershipPublic
+from app.schemes.membership import MembershipCreate, MembershipUpdate, MembershipPublic, MembershipListItem
 from app.utilities.exceptions import not_found
 
 router = APIRouter(prefix="/memberships", tags=["memberships"])
@@ -35,22 +35,23 @@ def get_membership(
 # READ (por nuip del cliente)
 
 
-@router.get("/customer/{nuip}", response_model=MembershipPublic | None)
-def get_active_customer_membership(
+@router.get("/customer/{nuip}", response_model=list[MembershipListItem])
+def get_memebrships_user(
     nuip: int,
-    service: MembershipServiceDep
+    service: MembershipServiceDep,
+    active: bool | None = None
 ):
-    return service.get_customer_membership(nuip)
+    return service.list_memberships_detail_by_customer(active, nuip)
 
 # READ (todos)
 
 
-@router.get("/", response_model=list[MembershipPublic])
+@router.get("", response_model=list[MembershipListItem])
 def list_memberships(
     service: MembershipServiceDep,
     active: bool | None = None
 ):
-    return service.list_memberships(active)
+    return service.list_memberships_detail(active)
 
 # UPDATE
 

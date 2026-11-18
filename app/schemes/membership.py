@@ -20,3 +20,16 @@ class MembershipPublic(MembershipCreate):
     start_date: date
     end_date: date | None
     membership_id: int
+
+
+class MembershipListItem(BaseModel):
+    membership_id: int
+    status: bool
+    start_date: date
+    end_date: date | None
+
+    customer_id: int
+    customer_name: str
+
+    plan_id: int
+    plan_name: str

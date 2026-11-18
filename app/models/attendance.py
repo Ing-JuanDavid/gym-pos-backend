@@ -16,7 +16,8 @@ class Attendance(SQLModel, table=True):
     )
     customer_id: int = Field(
         foreign_key="customer.customer_id", ondelete="CASCADE")
-    membership_id: int = Field(foreign_key="membership.membership_id")
+    membership_id: int = Field(
+        foreign_key="membership.membership_id", ondelete="CASCADE")
 
     customer: "Customer" = Relationship(
         back_populates="attendances"

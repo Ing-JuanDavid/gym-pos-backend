@@ -27,6 +27,12 @@ class SaleService:
 
         return db_sale
 
+    def list_sales(self) -> list[Sale]:
+
+        statement = select(Sale).order_by(desc(Sale.created_at))
+
+        return self.session.exec(statement).all()
+
     def create_sale(self, sale: SaleCreate) -> Sale:
 
         db_customer = self.customer_service.get_customer(sale.nuip)
