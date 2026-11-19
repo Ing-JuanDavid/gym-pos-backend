@@ -5,9 +5,11 @@ from typing import Annotated
 from datetime import datetime, time
 from app.models.attendance import Attendance
 from app.models.customers import Customer
+from app.models.membership import Membership
+from app.models.plan import Plan
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.services.membership import MembershipService, MembershipServiceDep
-from app.schemes.attendance import AttendanceCreate, AttendanceUpdate, AttendancePublic, AttendanceResponse, AttendanceResult
+from app.schemes.attendance import AttendancePublic, AttendanceResponse, AttendanceResult, AttendanceListItem
 from sqlmodel import select, desc
 from app.utilities.exceptions import not_found, conflict
 
@@ -87,6 +89,57 @@ class AttendanceService:
     def list_attendances(self) -> list[AttendancePublic]:
         statement = select(Attendance).order_by(desc(Attendance.check_in))
         return list(self.session.exec(statement))
+
+    from sqlmodel import select
+
+    def list_attendances_items(self) -> list[AttendanceListItem]:
+
+        statement = (
+            select(
+                Attendance,
+                Customer,
+                Membership,
+                Plan
+            )
+            .join(
+                Membership,
+                Attendance.membership_id == Membership.membership_id
+            )
+            .join(
+                Customer,
+                Attendance.customer_id == Customer.customer_id
+            )
+            .join(
+                Plan,
+                Membership.plan_id == Plan.plan_id
+            )
+            .order_by(
+                Attendance.check_in.desc()
+            )
+        )
+
+        results = self.session.exec(statement).all()
+
+        return [
+            AttendanceListItem(
+                attendance_id=attendance.id,
+
+                nuip=customer.nuip,
+                customer_name=f"{customer.first_name} {customer.last_name}",
+
+                membership_name=plan.name,
+
+                check_in=attendance.check_in,
+                check_out=attendance.check_out,
+
+                status=(
+                    "ACTIVE"
+                    if attendance.check_out is None
+                    else "FINISHED"
+                )
+            )
+            for attendance, customer, membership, plan in results
+        ]
 
     # DELETE
     def delete_attendance(self, attendance_id: int) -> bool:

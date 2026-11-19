@@ -5,10 +5,11 @@ from app.services.fingerprint import FingerPrintService
 from app.schemes.devices import DeviceCommand
 from app.utilities.exceptions import conflict
 from fastapi import WebSocket, HTTPException
+from app.services.frontend_hub import hub, access_event
 
 
 DELETE_TIMEOUT = 10
-ENROLL_TIMEOUT = 15
+ENROLL_TIMEOUT = 45
 pending_enrollments: dict[int, asyncio.Future] = {}
 
 # print_id -> Future que se resuelve cuando el ESP32 responde
@@ -52,7 +53,7 @@ async def _enroll_on_device(device_id: str, print_id: int):
 async def _delete_on_device(device_id: str, print_id: int) -> dict:
     if print_id in pending_deletions:
         raise conflict(
-            "ya hay una eliminación en curso para la huella {print_id}")
+            f"ya hay una eliminación en curso para la huella {print_id}")
     future = asyncio.get_running_loop().create_future()
     pending_deletions[print_id] = future
 
@@ -89,41 +90,40 @@ def _resolve_enrollment(fingerprint_id: int, ok: bool, reason: str | None):
         future.set_result({"ok": ok, "reason": reason})
 
 
-async def handle_finger_detected(message: dict, websocket: WebSocket, fingerprint_service: FingerPrintService, attendance_service: AttendanceService):
+async def handle_finger_detected(message, websocket, fingerprint_service,
+                                 attendance_service, device_id: str):
     fingerprint_id = message["fingerprint_id"]
-
-    db_fingerprint = (
-        fingerprint_service.get_fingerprint_by_print_id(
-            fingerprint_id
-        )
-    )
+    db_fingerprint = fingerprint_service.get_fingerprint_by_print_id(
+        fingerprint_id)
 
     if db_fingerprint is None:
-        print(
-            f"Fingerprint {fingerprint_id} no existe"
-        )
-
-        # Responder para que el ESP32 no espere el timeout de 5 s.
         await websocket.send_json({"type": DeviceCommand.DENY_ACCESS})
+        await hub.broadcast(access_event(
+            device_id=device_id, granted=False, reason="FINGER_NOT_FOUND"))
         return
 
-    response = attendance_service.register_attendance(
-        db_fingerprint.customer.nuip
-    )
+    customer = db_fingerprint.customer
+    response = attendance_service.register_attendance(customer.nuip)
+    granted = response.status in (
+        AttendanceResult.CHECK_OUT, AttendanceResult.CHECK_IN)
 
-    command = (
-        DeviceCommand.ALLOW_ACCESS
-        if response.status in (AttendanceResult.CHECK_OUT, AttendanceResult.CHECK_IN)
-        else DeviceCommand.DENY_ACCESS
-    )
-    print(
-        f"Attendance status={response.status.value} "
-        f"Sending command={command.value} "
-        f"for fingerprint={fingerprint_id}"
-    )
-    await websocket.send_json({"type": command})
+    # 1) El ESP primero (espera respuesta en menos de 5 s).
+    await websocket.send_json({
+        "type": DeviceCommand.ALLOW_ACCESS if granted else DeviceCommand.DENY_ACCESS})
 
-
+    # 2) Después la UI. hub.broadcast nunca lanza excepciones.
+    await hub.broadcast(access_event(
+        device_id=device_id,
+        granted=granted,
+        access_type=response.status.value if granted else None,
+        reason=None if granted else response.status.value,
+        customer={
+            "nuip": customer.nuip,
+            "full_name": f"{customer.first_name} {customer.last_name}",
+            "photo_url": None,       # TODO: URL de la foto más reciente del cliente
+        },
+        membership_end=None,         # TODO: fecha fin de la membresía activa
+    ))
 # helpers for esp-cam
 
 

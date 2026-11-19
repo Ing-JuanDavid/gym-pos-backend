@@ -26,3 +26,4 @@ class CustomerPublic(CustomerCreate):
     customer_id: int
     membership_name: str | None = None
     last_attendance: datetime | None = None
+    photo_url: str | None = None

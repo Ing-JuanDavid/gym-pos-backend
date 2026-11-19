@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from sqlmodel import Session
 from app.database import create_db_and_tables, boostrapt_db, engine
-from app.routers import customers, devices_ws, plan, membership, attendance, sale, payment, cash, fingerprint, capture
+from app.routers import customers, devices_ws, plan, membership, attendance, sale, payment, cash, fingerprint, capture, events
 from apscheduler.schedulers.background import BackgroundScheduler
 from app.services.jobs import expire_memberships
 from datetime import datetime
@@ -61,12 +61,15 @@ app.include_router(payment.router)
 
 app.include_router(cash.router)
 
+app.include_router(events.router)
+
 
 app.include_router(devices_ws.router)
 app.include_router(fingerprint.router)
 
 app.include_router(capture.router)
 
+(Path("media") / "captures").mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory="media"), name="media")
 
 

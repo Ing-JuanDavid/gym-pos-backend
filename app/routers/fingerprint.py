@@ -32,7 +32,7 @@ async def enroll_fingerprint(
 
     if not result["ok"]:
         raise conflict(
-            f"el dispositivo no pudo registrar la huella {print_id}")
+            f"el dispositivo no pudo registrar la huella {print_id} : {result['reason']}")
 
     fingerprint_service.create_fingerprint(
         FingerPrintCreate(print_id=print_id,

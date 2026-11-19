@@ -3,10 +3,18 @@ from app.services.attendance import AttendanceService, AttendanceServiceDep
 from app.services.customer import CustomerService, CustomerServiceDep
 from app.schemes.attendance import AttendanceCreate, AttendancePublic
 from app.utilities.exceptions import not_found
+from app.schemes.attendance import AttendanceListItem
 
 router = APIRouter(prefix="/attendances", tags=["attendances"])
 
 # CREATE (Check-in)
+
+
+@router.get("", response_model=list[AttendanceListItem])
+def list_attendances(
+    service: AttendanceServiceDep
+):
+    return service.list_attendances_items()
 
 
 @router.post("/customer/{nuip}/checkin", response_model=AttendancePublic)
@@ -59,11 +67,11 @@ def list_customer_attendances(
 # READ (todos)
 
 
-@router.get("/", response_model=list[AttendancePublic])
-def list_attendances(
-    service: AttendanceServiceDep
-):
-    return service.list_attendances()
+# @router.get("/", response_model=list[AttendancePublic])
+# def list_attendances(
+#     service: AttendanceServiceDep
+# ):
+#     return service.list_attendances()
 
 # DELETE
 

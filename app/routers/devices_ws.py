@@ -1,3 +1,4 @@
+from app.services.frontend_hub import hub, access_event
 import asyncio
 import json
 
@@ -15,72 +16,63 @@ router = APIRouter(prefix="/devices", tags=["Devices"])
 
 
 @router.websocket("/ws/{device_id}")
-async def device_websocket(
-    websocket: WebSocket,
-    device_id: str,
-    fingerprint_service: FingerPrintServiceDep,
-    attendance_service:  AttendanceServiceDep
-):
-    await manager.connect(
-        device_id,
-        websocket,
-    )
+async def device_websocket(websocket: WebSocket, device_id: str,
+                           fingerprint_service: FingerPrintServiceDep,
+                           attendance_service: AttendanceServiceDep):
+    await manager.connect(device_id, websocket)
+    await hub.device_online(device_id, "biometric")
 
     try:
-
         while True:
-
             message = await websocket.receive_json()
-
-            print(
-                f"[WS] {device_id} -> {message}"
-            )
-
+            hub.touch(device_id)
             event_type = message.get("type")
 
             match event_type:
+                case "ENROLL_STATUS":          # pasos: PLACE_FINGER, REMOVE_FINGER, ...
+                    await hub.broadcast({"type": "ENROLL_STATUS",
+                                         "device_id": device_id,
+                                         "status": message.get("status")})
                 case "ENROLL_SUCCESS":
                     device_helpers._resolve_enrollment(
-                        message["fingerprint_id"],
-                        ok=True,
-                        reason=None
-                    )
+                        message["fingerprint_id"], ok=True, reason=None)
+                    await hub.broadcast({"type": "ENROLL_SUCCESS", "device_id": device_id})
+
+                case "ENROLL_FAILED":
+                    # Antes se hacía pop() del future: el endpoint esperaba los 15 s
+                    # completos y respondía "no respondió a tiempo", perdiendo el motivo.
+                    device_helpers._resolve_enrollment(
+                        message["fingerprint_id"], ok=False, reason=message.get("status"))
+                    await hub.broadcast({"type": "ENROLL_FAILED",
+                                         "device_id": device_id,
+                                         "status": message.get("status")})
+
                 case "FINGER_DETECTED":
-                    await device_helpers.handle_finger_detected(message, websocket, fingerprint_service, attendance_service)
+                    await hub.broadcast({"type": "READING", "device_id": device_id})
+                    await device_helpers.handle_finger_detected(
+                        message, websocket, fingerprint_service,
+                        attendance_service, device_id)
+
+                case "FINGER_NOT_FOUND":
+                    await websocket.send_json({"type": DeviceCommand.DENY_ACCESS})
+                    await hub.broadcast(access_event(
+                        device_id=device_id, granted=False, reason="FINGER_NOT_FOUND"))
 
                 case "DELETE_SUCCESS":
                     device_helpers._resolve_deletion(
-                        message["fingerprint_id"],
-                        ok=True,
-                        reason=None,
-                    )
-
-                case "ENROLL_FAILED":
-
-                    fingerprint_id = message[
-                        "fingerprint_id"
-                    ]
-
-                    device_helpers.pending_enrollments.pop(
-                        fingerprint_id,
-                        None,
-                    )
-                case "FINGER_NOT_FOUND":
-                    await websocket.send_json({"type": DeviceCommand.DENY_ACCESS})
+                        message["fingerprint_id"], ok=True, reason=None)
 
                 case "DELETE_FAILED":
                     device_helpers._resolve_deletion(
-                        message["fingerprint_id"],
-                        ok=False,
-                        reason=message.get("status"),
-                    )
+                        message["fingerprint_id"], ok=False, reason=message.get("status"))
 
     except WebSocketDisconnect:
-
-        manager.disconnect(
-            device_id,
-            websocket,
-        )
+        pass
+    finally:
+        manager.disconnect(device_id, websocket)
+        # Si el ESP ya reconectó con otro socket, no lo marques como caído.
+        if device_id not in manager.active_devices:
+            await hub.device_offline(device_id)
 
 
 @router.websocket("/ws/cam/{device_id}")
@@ -91,6 +83,7 @@ async def camera_websocket(websocket: WebSocket, device_id: str):
     POST /devices/captures/upload/{device_id}.
     """
     await manager.connect(device_id, websocket)
+    await hub.device_online(device_id, "camera")
 
     try:
         while True:
@@ -110,9 +103,12 @@ async def camera_websocket(websocket: WebSocket, device_id: str):
                 if data.get("type") == "CAPTURE_FAILED":
                     device_helpers._resolve_capture(
                         device_id, error=data.get("status"))
+                hub.touch(device_id)
 
     finally:
         manager.disconnect(device_id, websocket)
+        if device_id not in manager.active_devices:
+            await hub.device_offline(device_id)
 
 
 # @router.post("/attendance/start")

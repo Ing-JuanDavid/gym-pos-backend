@@ -40,3 +40,17 @@ class AttendanceResponse(BaseModel):
     attendance_id: int | None = None
     customer_id: int | None = None
     message: str | None = None
+
+
+class AttendanceListItem(BaseModel):
+    attendance_id: int
+
+    nuip: int
+    customer_name: str
+
+    membership_name: str | None
+
+    check_in: datetime
+    check_out: datetime | None
+
+    status: str
